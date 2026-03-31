@@ -1,0 +1,44 @@
+# RoundTable 项目根目录
+
+## 敏感文件（禁止提交）
+.env
+*.key
+*.secret
+credentials.json
+
+## 日志文件
+*.log
+logs/
+
+## Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.eggs/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+ENV/
+
+## 项目数据
+data/checkpoints/
+output/
+knowledge/vectors/
+*.db
+*.sqlite
+
+## IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+## OS
+.DS_Store
+Thumbs.db
