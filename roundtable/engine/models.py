@@ -385,12 +385,52 @@ class OpenRouterClient(BaseModelClient):
 
 
 class DashScopeClient(BaseModelClient):
-    """阿里百炼（通义千问）客户端"""
+    """阿里百炼（通义千问）客户端
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "qwen-plus"):
+    支持两种 API 模式：
+    1. 标准 API (按量计费/开发者计划):
+       - API Key 格式：sk-xxxxx
+       - Base URL: https://dashscope.aliyuncs.com/api/v1
+
+    2. Coding Plan API (套餐专属):
+       - API Key 格式：sk-sp-xxxxx
+       - Base URL: https://coding.dashscope.aliyuncs.com/v1
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: str = "qwen-plus",
+        use_coding_plan: Optional[bool] = None,
+    ):
         self.config = get_model_config()
-        self.api_key = api_key or self.config.DASHSCOPE_API_KEY
+
+        # 自动检测 API Key 类型
+        if api_key is None:
+            # 优先使用 Coding Plan API Key（如果配置了）
+            if self.config.DASHSCOPE_CODING_API_KEY:
+                self.api_key = self.config.DASHSCOPE_CODING_API_KEY
+                self.use_coding_plan = True
+            else:
+                self.api_key = self.config.DASHSCOPE_API_KEY
+                self.use_coding_plan = False
+        else:
+            self.api_key = api_key
+            # 根据 API Key 格式自动检测类型
+            self.use_coding_plan = (
+                use_coding_plan if use_coding_plan is not None
+                else api_key.startswith("sk-sp-")
+            )
+
         self.default_model = model
+
+        # 根据类型设置 Base URL
+        if self.use_coding_plan:
+            self.base_url = self.config.DASHSCOPE_CODING_BASE_URL
+            logger.info("使用 DashScope Coding Plan API")
+        else:
+            self.base_url = self.config.DASHSCOPE_BASE_URL
+            logger.info("使用 DashScope 标准 API")
 
         if not self.api_key:
             logger.warning("DASHSCOPE_API_KEY 未配置，通义千问功能不可用")
@@ -409,7 +449,7 @@ class DashScopeClient(BaseModelClient):
         """
         调用通义千问模型
 
-        使用阿里百炼 API
+        使用阿里百炼 API（标准 API 或 Coding Plan API）
         """
         if not self.api_key:
             raise ModelError(
@@ -424,29 +464,46 @@ class DashScopeClient(BaseModelClient):
         try:
             import httpx
 
-            # 使用阿里百炼标准 API 端点
-            url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-                "X-DashScope-SSE": "disable",
-            }
-
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
-
-            payload = {
-                "model": model_name,
-                "input": {
-                    "messages": messages
-                },
-                "parameters": {
+            # 根据 API 类型使用不同的端点
+            if self.use_coding_plan:
+                # Coding Plan API (OpenAI 兼容格式)
+                url = f"{self.base_url}/chat/completions"
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                }
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+                payload = {
+                    "model": model_name,
+                    "messages": messages,
                     "max_tokens": max_tokens,
                     "temperature": temperature,
                 }
-            }
+            else:
+                # 标准 API
+                url = f"{self.base_url}/services/aigc/text-generation/generation"
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                    "X-DashScope-SSE": "disable",
+                }
+                messages = []
+                if system_prompt:
+                    messages.append({"role": "system", "content": system_prompt})
+                messages.append({"role": "user", "content": prompt})
+                payload = {
+                    "model": model_name,
+                    "input": {
+                        "messages": messages
+                    },
+                    "parameters": {
+                        "max_tokens": max_tokens,
+                        "temperature": temperature,
+                    }
+                }
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(url, headers=headers, json=payload)
@@ -456,11 +513,19 @@ class DashScopeClient(BaseModelClient):
                 response.raise_for_status()
                 data = response.json()
 
-            # 解析响应
-            content = data["output"]["choices"][0]["message"]["content"]
-            usage = data.get("usage", {})
-            tokens_in = usage.get("input_tokens", 0)
-            tokens_out = usage.get("output_tokens", 0)
+            # 解析响应（两种格式）
+            if self.use_coding_plan:
+                # Coding Plan API (OpenAI 兼容格式)
+                content = data["choices"][0]["message"]["content"]
+                usage = data.get("usage", {})
+                tokens_in = usage.get("prompt_tokens", 0)
+                tokens_out = usage.get("completion_tokens", 0)
+            else:
+                # 标准 API
+                content = data["output"]["choices"][0]["message"]["content"]
+                usage = data.get("usage", {})
+                tokens_in = usage.get("input_tokens", 0)
+                tokens_out = usage.get("output_tokens", 0)
 
             latency_ms = int((time.time() - start_time) * 1000)
 

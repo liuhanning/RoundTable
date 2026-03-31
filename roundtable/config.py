@@ -53,6 +53,12 @@ class ModelConfig:
     DASHSCOPE_BASE_URL: str = "https://dashscope.aliyuncs.com/api/v1"
     DASHSCOPE_MODEL: str = "qwen-plus"  # 默认模型：qwen-plus, qwen-max, qwen-turbo
 
+    # 阿里百炼 Coding Plan 专属配置（套餐额度）
+    # API Key 格式：sk-sp-xxxxx
+    # Base URL: https://coding.dashscope.aliyuncs.com/v1 (OpenAI 兼容)
+    DASHSCOPE_CODING_API_KEY: Optional[str] = None
+    DASHSCOPE_CODING_BASE_URL: str = "https://coding.dashscope.aliyuncs.com/v1"
+
 
 @dataclass
 class CostConfig:
