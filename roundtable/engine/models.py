@@ -562,6 +562,17 @@ class ModelClient:
             ModelProvider.OPENROUTER,
         ]
 
+    def _normalize_provider(self, provider: Any) -> ModelProvider:
+        """将字符串或其他类型的 provider 转换为 ModelProvider 枚举"""
+        if isinstance(provider, ModelProvider):
+            return provider
+        if isinstance(provider, str):
+            try:
+                return ModelProvider(provider.lower())
+            except ValueError as exc:
+                raise ValueError(f"Unsupported provider: {provider}") from exc
+        raise TypeError(f"Unsupported provider type: {type(provider).__name__}")
+
     def _get_client(self, provider: ModelProvider) -> Optional[BaseModelClient]:
         """获取或创建客户端"""
         if provider not in self.clients:
@@ -718,7 +729,9 @@ class ModelClient:
         """
         tasks = []
         for prompt_config in prompts:
-            provider = prompt_config.get("provider", ModelProvider.GEMINI)
+            provider = self._normalize_provider(
+                prompt_config.get("provider", ModelProvider.GEMINI)
+            )
             task = self.call(
                 prompt=prompt_config["prompt"],
                 system_prompt=system_prompt,
@@ -728,7 +741,25 @@ class ModelClient:
             )
             tasks.append(task)
 
-        return await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        responses: List[ModelResponse] = []
+        errors: List[Exception] = []
+        for result in results:
+            if isinstance(result, Exception):
+                errors.append(result)
+            else:
+                responses.append(result)
+
+        if responses:
+            for error in errors:
+                logger.warning(f"Parallel model call failed: {error}")
+            return responses
+
+        if errors:
+            raise errors[0]
+
+        return responses
 
     def get_stats(self) -> Dict[str, Any]:
         """获取调用统计"""
