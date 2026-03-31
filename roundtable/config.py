@@ -51,6 +51,7 @@ class ModelConfig:
     # 阿里百炼（通义千问）
     DASHSCOPE_API_KEY: Optional[str] = None
     DASHSCOPE_BASE_URL: str = "https://dashscope.aliyuncs.com/api/v1"
+    DASHSCOPE_MODEL: str = "qwen-plus"  # 默认模型：qwen-plus, qwen-max, qwen-turbo
 
 
 @dataclass
@@ -74,12 +75,11 @@ class CostConfig:
                 # aicodewith Claude
                 "claude-sonnet": {"in": 0.003, "out": 0.015},
                 "claude-opus": {"in": 0.015, "out": 0.075},
+                # 阿里百炼（通义千问）- 开发者计划免费额度
+                "qwen-plus": {"in": 0.0005, "out": 0.001},
+                "qwen-max": {"in": 0.002, "out": 0.006},
+                "qwen-turbo": {"in": 0.0003, "out": 0.0006},
             }
-
-
-    # 阿里百炼（通义千问）
-    DASHSCOPE_API_KEY: Optional[str] = None
-    DASHSCOPE_BASE_URL: str = "https://dashscope.aliyuncs.com/api/v1"
 
 
 def load_security_config() -> SecurityConfig:
