@@ -3,12 +3,10 @@
 
 支持模型：
 - Gemini (Google 直连)
-- Claude (aicodewith + LiteLLM)
-- GPT (OpenRouter)
-- DeepSeek (OpenRouter)
-- 火山方舟（备选）
+- GPT / DeepSeek (OpenRouter)
+- 通义千问 (DashScope)
 
-故障切换链：gemini → claude → volcengine → deepseek
+故障切换链：gemini → openrouter → dashscope
 """
 import asyncio
 import time
@@ -106,6 +104,7 @@ class GeminiClient(BaseModelClient):
     def __init__(self, api_key: Optional[str] = None):
         self.config = get_model_config()
         self.api_key = api_key or self.config.GEMINI_API_KEY
+        self.default_model = self.config.GEMINI_MODEL
         self.base_url = "https://generativelanguage.googleapis.com/v1beta"
 
         if not self.api_key:
@@ -139,7 +138,7 @@ class GeminiClient(BaseModelClient):
             import httpx
 
             # 构建请求
-            url = f"{self.base_url}/models/gemini-2.0-flash:generateContent"
+            url = f"{self.base_url}/models/{self.default_model}:generateContent"
             headers = {
                 "Content-Type": "application/json",
             }
@@ -203,7 +202,7 @@ class GeminiClient(BaseModelClient):
 
             return ModelResponse(
                 content=content,
-                model="gemini-2.0-flash",
+                model=self.default_model,
                 provider=ModelProvider.GEMINI,
                 tokens_in=0,  # Gemini 不返回
                 tokens_out=tokens_out,
@@ -218,7 +217,7 @@ class GeminiClient(BaseModelClient):
                 message=f"Gemini 调用超时：{e}",
                 provider=ModelProvider.GEMINI,
                 retryable=True,
-                fallback_model="claude",
+                fallback_model=ModelProvider.OPENROUTER.value,
             )
         except httpx.HTTPStatusError as e:
             logger.error(f"Gemini 返回错误：{e}")
@@ -226,7 +225,7 @@ class GeminiClient(BaseModelClient):
                 message=f"Gemini API 错误：{e.response.status_code}",
                 provider=ModelProvider.GEMINI,
                 retryable=e.response.status_code >= 500,
-                fallback_model="claude",
+                fallback_model=ModelProvider.OPENROUTER.value,
             )
         except Exception as e:
             logger.error(f"Gemini 调用失败：{e}")
@@ -234,7 +233,7 @@ class GeminiClient(BaseModelClient):
                 message=f"Gemini 调用失败：{e}",
                 provider=ModelProvider.GEMINI,
                 retryable=True,
-                fallback_model="claude",
+                fallback_model=ModelProvider.OPENROUTER.value,
             )
 
 
@@ -343,7 +342,7 @@ class OpenRouterClient(BaseModelClient):
                 message=f"OpenRouter 调用超时：{e}",
                 provider=ModelProvider.OPENROUTER,
                 retryable=True,
-                fallback_model="deepseek",
+                fallback_model=ModelProvider.DASHSCOPE.value,
             )
         except httpx.HTTPStatusError as e:
             logger.error(f"OpenRouter 返回错误：{e}")
@@ -351,7 +350,7 @@ class OpenRouterClient(BaseModelClient):
                 message=f"OpenRouter API 错误：{e.response.status_code}",
                 provider=ModelProvider.OPENROUTER,
                 retryable=e.response.status_code >= 500,
-                fallback_model="deepseek",
+                fallback_model=ModelProvider.DASHSCOPE.value,
             )
         except Exception as e:
             logger.error(f"OpenRouter 调用失败：{e}")
@@ -359,7 +358,7 @@ class OpenRouterClient(BaseModelClient):
                 message=f"OpenRouter 调用失败：{e}",
                 provider=ModelProvider.OPENROUTER,
                 retryable=True,
-                fallback_model="deepseek",
+                fallback_model=ModelProvider.DASHSCOPE.value,
             )
 
     def _calculate_cost(self, model: str, tokens_in: int, tokens_out: int) -> float:
@@ -400,7 +399,7 @@ class DashScopeClient(BaseModelClient):
     def __init__(
         self,
         api_key: Optional[str] = None,
-        model: str = "qwen-plus",
+        model: Optional[str] = None,
         use_coding_plan: Optional[bool] = None,
     ):
         self.config = get_model_config()
@@ -422,7 +421,7 @@ class DashScopeClient(BaseModelClient):
                 else api_key.startswith("sk-sp-")
             )
 
-        self.default_model = model
+        self.default_model = model or self.config.DASHSCOPE_MODEL
 
         # 根据类型设置 Base URL
         if self.use_coding_plan:
@@ -586,12 +585,14 @@ class DashScopeClient(BaseModelClient):
         # 通义千问成本（每 1k tokens）
         model_costs = {
             "qwen-turbo": {"in": 0.0003, "out": 0.0006},
-            "qwen-plus": {"in": 0.0005, "out": 0.001},
+            "qwen3.5-plus": {"in": 0.0005, "out": 0.001},
+            "qwen3-coder-plus": {"in": 0.0005, "out": 0.001},
+            "qwen3-coder-next": {"in": 0.0005, "out": 0.001},
             "qwen-max": {"in": 0.002, "out": 0.006},
         }
 
         # 查找匹配的模型
-        rates = model_costs.get("qwen-plus", {"in": 0.0005, "out": 0.001})
+        rates = model_costs.get("qwen3.5-plus", {"in": 0.0005, "out": 0.001})
         for key in model_costs:
             if key in model.lower():
                 rates = model_costs[key]
@@ -623,8 +624,8 @@ class ModelClient:
         # 故障切换链
         self.fallback_chain = [
             ModelProvider.GEMINI,
-            ModelProvider.DASHSCOPE,
             ModelProvider.OPENROUTER,
+            ModelProvider.DASHSCOPE,
         ]
 
     def _normalize_provider(self, provider: Any) -> ModelProvider:
@@ -681,11 +682,17 @@ class ModelClient:
 
         last_error: Optional[ModelError] = None
         all_errors: List[ModelError] = []
+        forced_next_provider: Optional[ModelProvider] = None
 
         for provider in call_chain:
+            if forced_next_provider is not None and provider != forced_next_provider:
+                continue
+
             client = self._get_client(provider)
             if not client:
                 logger.warning(f"{provider.value} 客户端不可用，跳过")
+                if forced_next_provider == provider:
+                    forced_next_provider = None
                 continue
 
             # 为当前提供商维护重试计数器
@@ -725,6 +732,7 @@ class ModelClient:
                     # 有指定 fallback_model → 立即切换（现有行为）
                     if e.fallback_model:
                         logger.info(f"切换到备用模型：{e.fallback_model}")
+                        forced_next_provider = self._normalize_provider(e.fallback_model)
                         break
 
                     # 无 fallback_model → 重试同一提供商
@@ -766,6 +774,9 @@ class ModelClient:
                             },
                         )
                         break
+
+            if forced_next_provider == provider:
+                forced_next_provider = None
 
         # 所有提供商都失败
         error_details = [str(e) for e in all_errors] if all_errors else ["未知错误"]

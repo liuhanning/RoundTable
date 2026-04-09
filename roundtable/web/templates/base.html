@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}圆桌讨论{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">RT</span>
+        <div>
+          <strong>RoundTable</strong>
+          <p>可视化 MVP</p>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="/settings">设置</a>
+        <a href="/sessions/new">新建会话</a>
+        <a href="/sessions/new#recent">最近会话</a>
+      </nav>
+      <section class="recent">
+        <h3>最近会话</h3>
+        {% if recent_sessions %}
+          <ul>
+            {% for session in recent_sessions[:6] %}
+              <li>
+                <a href="/sessions/{{ session.session_id }}">
+                  <span>{{ session.title }}</span>
+                  <small>{{ status_labels.get(session.status, session.status) }}</small>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p>还没有会话。</p>
+        {% endif %}
+      </section>
+    </aside>
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

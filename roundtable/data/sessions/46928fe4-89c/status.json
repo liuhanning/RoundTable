@@ -1,0 +1,21 @@
+{
+  "session_id": "46928fe4-89c",
+  "status": "failed",
+  "current_stage": "independent",
+  "completed_stages": [],
+  "stage_summaries": {},
+  "error_summary": "openrouter: 所有模型调用失败，最后错误：OpenRouter API Key 未配置; 详细错误：gemini: Gemini API 错误：404, dashscope: DashScope API 错误：400, openrouter: OpenRouter API Key 未配置",
+  "next_action": "修复错误后重试或恢复",
+  "report_path": null,
+  "cost_summary": {
+    "session_id": "46928fe4-89c",
+    "total_budget": 0.5,
+    "spent": 0,
+    "remaining": 0.5,
+    "usage_percent": 0.0,
+    "call_count": 0,
+    "is_exceeded": false,
+    "warning_triggered": false
+  },
+  "updated_at": "2026-04-05T23:15:07.981154+00:00"
+}

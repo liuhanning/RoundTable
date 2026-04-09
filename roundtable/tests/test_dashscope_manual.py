@@ -69,7 +69,7 @@ async def test_coding_plan_api():
 
     client = DashScopeClient(
         api_key=api_key,
-        model="qwen-plus",
+        model="qwen3.5-plus",
         use_coding_plan=True,
     )
     print(f"使用 API 类型：{'Coding Plan' if client.use_coding_plan else '标准'}")

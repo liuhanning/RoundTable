@@ -5,6 +5,7 @@ import pytest
 import asyncio
 from unittest.mock import patch, MagicMock
 import os
+from types import SimpleNamespace
 
 from engine.models import (
     ModelProvider,
@@ -24,7 +25,7 @@ class TestDashScopeClientInit:
     def test_init_default_model(self):
         """测试默认模型初始化"""
         client = DashScopeClient()
-        assert client.default_model == "qwen-plus"
+        assert client.default_model == "qwen3.5-plus"
 
     def test_init_custom_model(self):
         """测试自定义模型初始化"""
@@ -33,16 +34,31 @@ class TestDashScopeClientInit:
 
     def test_init_api_key_from_config(self, monkeypatch):
         """测试从配置加载 API Key"""
-        monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key-123")
-        # 重新加载配置
-        import config
-        config._model_config = None
+        monkeypatch.setattr(
+            "engine.models.get_model_config",
+            lambda: SimpleNamespace(
+                DASHSCOPE_API_KEY="test-key-123",
+                DASHSCOPE_CODING_API_KEY=None,
+                DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/api/v1",
+                DASHSCOPE_CODING_BASE_URL="https://coding.dashscope.aliyuncs.com/v1",
+                DASHSCOPE_MODEL="qwen3.5-plus",
+            ),
+        )
         client = DashScopeClient()
         assert client.api_key == "test-key-123"
 
-    def test_init_no_api_key_warning(self, caplog):
+    def test_init_no_api_key_warning(self, monkeypatch, caplog):
         """测试无 API Key 时警告"""
-        import logging
+        monkeypatch.setattr(
+            "engine.models.get_model_config",
+            lambda: SimpleNamespace(
+                DASHSCOPE_API_KEY=None,
+                DASHSCOPE_CODING_API_KEY=None,
+                DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/api/v1",
+                DASHSCOPE_CODING_BASE_URL="https://coding.dashscope.aliyuncs.com/v1",
+                DASHSCOPE_MODEL="qwen3.5-plus",
+            ),
+        )
         client = DashScopeClient(api_key=None)
         assert "DASHSCOPE_API_KEY 未配置" in caplog.text
 
@@ -53,8 +69,18 @@ class TestDashScopeClientInit:
 class TestDashScopeClientCall:
     """DashScope 客户端调用测试"""
 
-    def test_call_no_api_key_raises(self):
+    def test_call_no_api_key_raises(self, monkeypatch):
         """测试无 API Key 时抛出异常"""
+        monkeypatch.setattr(
+            "engine.models.get_model_config",
+            lambda: SimpleNamespace(
+                DASHSCOPE_API_KEY=None,
+                DASHSCOPE_CODING_API_KEY=None,
+                DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/api/v1",
+                DASHSCOPE_CODING_BASE_URL="https://coding.dashscope.aliyuncs.com/v1",
+                DASHSCOPE_MODEL="qwen3.5-plus",
+            ),
+        )
         client = DashScopeClient(api_key=None)
 
         with pytest.raises(ModelError) as exc_info:
@@ -138,34 +164,21 @@ class TestDashScopeClientCall:
         with pytest.raises(ModelError) as exc_info:
             asyncio.run(client.call("测试"))
 
-        assert "返回空响应" in str(exc_info.value)
+        assert "调用失败" in str(exc_info.value)
 
-    def test_call_http_error_retries(self, monkeypatch):
-        """测试 HTTP 错误时重试"""
+    def test_call_http_error_raises_model_error(self, monkeypatch):
+        """测试 HTTP 错误时包装为 ModelError"""
         import httpx
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "output": {"choices": [{"message": {"content": "Success"}}]},
-            "usage": {"input_tokens": 5, "output_tokens": 5},
-        }
-
-        call_count = 0
 
         async def mock_post(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count < 2:
-                raise httpx.HTTPStatusError("500 Error", request=MagicMock(), response=MagicMock(status_code=500))
-            return mock_response
+            raise httpx.HTTPStatusError("500 Error", request=MagicMock(), response=MagicMock(status_code=500))
 
         monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
 
         client = DashScopeClient(api_key="test-key")
-        response = asyncio.run(client.call("测试"))
-
-        assert response.content == "Success"
-        assert call_count == 2  # 重试了一次
+        with pytest.raises(ModelError) as exc_info:
+            asyncio.run(client.call("测试"))
+        assert "DashScope API 错误：500" in str(exc_info.value)
 
     def test_call_temperature_and_max_tokens(self, monkeypatch):
         """测试温度和 max_tokens 参数传递"""
@@ -217,10 +230,10 @@ class TestDashScopeCostCalculation:
 
         monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
 
-        client = DashScopeClient(api_key="test-key", model="qwen-plus")
+        client = DashScopeClient(api_key="test-key", model="qwen3.5-plus")
         response = asyncio.run(client.call("测试"))
 
-        # qwen-plus: $0.0005/1k input, $0.001/1k output
+        # qwen3.5-plus: $0.0005/1k input, $0.001/1k output
         expected_cost = (1000 / 1000 * 0.0005) + (2000 / 1000 * 0.001)
         assert response.cost_usd == expected_cost
 

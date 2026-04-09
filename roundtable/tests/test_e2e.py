@@ -90,22 +90,59 @@ class TestModelClient:
         """测试 Gemini 超时处理"""
         from engine.models import GeminiClient, ModelError
         import httpx
-        # 简单测试：验证超时错误被正确包装为 ModelError
-        # 实际网络超时测试需要真实环境，这里只做单元测试
+
+        async def mock_post(*args, **kwargs):
+            raise httpx.TimeoutException("timeout")
+
         client = GeminiClient(api_key="test-key")
-        # 验证 client 正确配置
-        assert client.api_key == "test-key"
-        assert client.get_provider() == ModelProvider.GEMINI
+
+        with patch("httpx.AsyncClient.post", side_effect=mock_post):
+            with pytest.raises(ModelError) as exc_info:
+                await client.call("test")
+
+        assert exc_info.value.provider == ModelProvider.GEMINI
+        assert exc_info.value.retryable is True
+        assert exc_info.value.fallback_model == ModelProvider.OPENROUTER.value
 
     @pytest.mark.asyncio
     async def test_gemini_client_http_error(self):
         """测试 Gemini HTTP 错误处理"""
         from engine.models import GeminiClient, ModelError
-        # 简单测试：验证 HTTP 错误被正确包装为 ModelError
-        # 实际 HTTP 错误测试需要真实环境，这里只做单元测试
+        import httpx
+
         client = GeminiClient(api_key="test-key")
-        # 验证 client 正确配置
-        assert client.base_url == "https://generativelanguage.googleapis.com/v1beta"
+
+        async def mock_post(*args, **kwargs):
+            request = httpx.Request("POST", "https://example.com")
+            response = httpx.Response(status_code=503, request=request)
+            raise httpx.HTTPStatusError("503 Service Unavailable", request=request, response=response)
+
+        with patch("httpx.AsyncClient.post", side_effect=mock_post):
+            with pytest.raises(ModelError) as exc_info:
+                await client.call("test")
+
+        assert exc_info.value.provider == ModelProvider.GEMINI
+        assert exc_info.value.retryable is True
+        assert exc_info.value.fallback_model == ModelProvider.OPENROUTER.value
+
+    @pytest.mark.asyncio
+    async def test_openrouter_client_timeout_falls_back_to_dashscope(self):
+        """测试 OpenRouter 超时时 fallback 到 DashScope provider"""
+        from engine.models import OpenRouterClient, ModelError
+        import httpx
+
+        async def mock_post(*args, **kwargs):
+            raise httpx.TimeoutException("timeout")
+
+        client = OpenRouterClient(api_key="test-key")
+
+        with patch("httpx.AsyncClient.post", side_effect=mock_post):
+            with pytest.raises(ModelError) as exc_info:
+                await client.call("test")
+
+        assert exc_info.value.provider == ModelProvider.OPENROUTER
+        assert exc_info.value.retryable is True
+        assert exc_info.value.fallback_model == ModelProvider.DASHSCOPE.value
 
     def test_openrouter_calculate_cost(self):
         """测试 OpenRouter 成本计算"""
@@ -449,7 +486,7 @@ class TestCostTracker:
         """测试成本估算"""
         tracker = CostTracker()
         # Gemini 免费
-        cost = tracker._estimate_cost("gemini-2.0-flash", 1000, 500)
+        cost = tracker._estimate_cost("gemini-2.5-flash", 1000, 500)
         assert cost == 0.0
         # Claude Sonnet
         cost = tracker._estimate_cost("claude-sonnet-4-5", 1000, 500)

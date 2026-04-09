@@ -8,7 +8,7 @@ import re
 import logging
 import json
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # 敏感信息正则模式
@@ -242,7 +242,7 @@ class AuditLogger:
             result: 结果（success/failure）
             details: 额外详情（会自动脱敏）
         """
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
 
         # 脱敏用户 ID（只保留部分）
         safe_user_id = self._safe_redact_id(user_id) if user_id else None

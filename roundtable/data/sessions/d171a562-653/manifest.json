@@ -1,0 +1,57 @@
+{
+  "session_id": "d171a562-653",
+  "title": "修复后基础测试",
+  "project_name": "RT Smoke Test",
+  "task_description": "请输出一个简短的测试结论，验证修复后的基础链路是否可运行。",
+  "created_at": "2026-04-05T23:19:47.657547+00:00",
+  "created_from": "web",
+  "roles": [
+    {
+      "role_id": "planner",
+      "enabled": true,
+      "display_name": "Planner",
+      "responsibility": "Plan",
+      "instruction": "Be structured and concise.",
+      "model": "gemini-2.5-flash"
+    }
+  ],
+  "attachments": [],
+  "model_snapshot": {},
+  "settings_snapshot": {
+    "enabled_models": {
+      "gemini-2.5-flash": true,
+      "openrouter/deepseek/deepseek-chat-v3-0324:free": false,
+      "qwen3.5-plus": true
+    },
+    "role_template_defaults": {},
+    "ui_defaults": {}
+  },
+  "execution_snapshot": {
+    "providers": {
+      "gemini": {
+        "configured": true,
+        "masked_value": "AIza****t_Ts"
+      },
+      "claude": {
+        "configured": false,
+        "masked_value": ""
+      },
+      "openrouter": {
+        "configured": false,
+        "masked_value": ""
+      },
+      "volcengine": {
+        "configured": false,
+        "masked_value": ""
+      },
+      "dashscope": {
+        "configured": false,
+        "masked_value": ""
+      },
+      "dashscope_coding": {
+        "configured": true,
+        "masked_value": "sk-s****a19b"
+      }
+    }
+  }
+}

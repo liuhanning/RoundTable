@@ -4,7 +4,7 @@ P0-1: Prompt 注入防护
 安全红线：所有从知识库检索的内容在注入 prompt 前必须经过安全隔离处理
 防止用户上传的文档中包含恶意指令劫持模型行为
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from config import get_security_config
 
 

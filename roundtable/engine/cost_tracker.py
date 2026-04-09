@@ -9,7 +9,7 @@
 import json
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from config import get_cost_config
@@ -195,7 +195,7 @@ class CostTracker:
 
         # 记录历史
         record = CostRecord(
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             session_id=session_id,
             stage=stage,
             model=model,
@@ -248,7 +248,7 @@ class CostTracker:
 
     def get_downgrade_model(self) -> str:
         """获取降级后的模型（免费）"""
-        return "gemini-2.0-flash"
+        return "gemini-2.5-flash"
 
     def get_cost_report(self, session_id: Optional[str] = None) -> Dict[str, Any]:
         """

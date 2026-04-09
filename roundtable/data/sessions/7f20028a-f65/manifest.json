@@ -1,0 +1,85 @@
+{
+  "session_id": "7f20028a-f65",
+  "title": "手动回归测试",
+  "project_name": "RT Manual Test",
+  "task_description": "请给出一段简短结论，确认手动回归链路正常。",
+  "created_at": "2026-04-05T23:26:09.232504+00:00",
+  "created_from": "web",
+  "roles": [
+    {
+      "role_id": "planner",
+      "enabled": true,
+      "display_name": "Planner",
+      "responsibility": "Plan",
+      "instruction": "Be structured and concise.",
+      "model": "gemini-2.5-flash"
+    },
+    {
+      "role_id": "challenger",
+      "enabled": false,
+      "display_name": "Challenger",
+      "responsibility": "Challenge",
+      "instruction": "Find risks.",
+      "model": "openrouter/deepseek/deepseek-chat-v3-0324:free"
+    },
+    {
+      "role_id": "synthesizer",
+      "enabled": true,
+      "display_name": "Synthesizer",
+      "responsibility": "Summarize",
+      "instruction": "Summarize clearly.",
+      "model": "qwen3.5-plus"
+    }
+  ],
+  "attachments": [
+    {
+      "attachment_id": "fb7303314220",
+      "filename": "manual-smoke.md",
+      "extension": ".md",
+      "size_bytes": 62,
+      "stored_path": "data\\sessions\\7f20028a-f65\\attachments\\fb7303314220\\manual-smoke.md",
+      "classification": "internal",
+      "injection_mode": "embedded",
+      "extraction_status": "ready",
+      "extraction_error": null
+    }
+  ],
+  "model_snapshot": {},
+  "settings_snapshot": {
+    "enabled_models": {
+      "gemini-2.5-flash": true,
+      "openrouter/deepseek/deepseek-chat-v3-0324:free": false,
+      "qwen3.5-plus": true
+    },
+    "role_template_defaults": {},
+    "ui_defaults": {}
+  },
+  "execution_snapshot": {
+    "providers": {
+      "gemini": {
+        "configured": true,
+        "masked_value": "AIza****t_Ts"
+      },
+      "claude": {
+        "configured": false,
+        "masked_value": ""
+      },
+      "openrouter": {
+        "configured": false,
+        "masked_value": ""
+      },
+      "volcengine": {
+        "configured": false,
+        "masked_value": ""
+      },
+      "dashscope": {
+        "configured": false,
+        "masked_value": ""
+      },
+      "dashscope_coding": {
+        "configured": true,
+        "masked_value": "sk-s****a19b"
+      }
+    }
+  }
+}

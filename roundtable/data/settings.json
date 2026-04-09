@@ -1,0 +1,9 @@
+{
+  "enabled_models": {
+    "gemini-2.5-flash": true,
+    "openrouter/deepseek/deepseek-chat-v3-0324:free": false,
+    "qwen3.5-plus": true
+  },
+  "role_template_defaults": {},
+  "ui_defaults": {}
+}

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}设置 | 圆桌讨论{% endblock %}
+{% block content %}
+<section class="page-head">
+  <p class="eyebrow">控制台</p>
+  <h1>设置</h1>
+  <p class="lede">管理 provider 密钥，并决定工作台允许使用哪些模型。</p>
+</section>
+
+<section class="panel-grid">
+  <article class="panel">
+    <header>
+      <h2>Provider 密钥</h2>
+      <p>密钥保存在 <code>.env</code> 中，页面只展示脱敏后的值。</p>
+    </header>
+    <div class="provider-list">
+      {% for provider in providers %}
+        <form class="provider-form" data-provider="{{ provider.provider }}">
+          <label>{{ provider.provider }}</label>
+          <div class="provider-meta">
+            <span class="status-chip status-{{ provider.connection_status }}">{{ provider_status_labels.get(provider.connection_status, provider.connection_status) }}</span>
+            <span>{{ provider.masked_value or "未配置" }}</span>
+          </div>
+          <input type="password" name="api_key" placeholder="粘贴 {{ provider.provider }} 密钥">
+          <button type="submit">保存</button>
+        </form>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel">
+    <header>
+      <h2>启用模型</h2>
+      <p>产品层配置保存在 <code>settings.json</code> 中。</p>
+    </header>
+    <form id="models-form">
+      {% for model_name, enabled in settings.enabled_models.items() %}
+        <label class="toggle-row">
+          <span>{{ model_name }}</span>
+          <input type="checkbox" name="{{ model_name }}" {% if enabled %}checked{% endif %}>
+        </label>
+      {% endfor %}
+      <button type="submit">保存模型设置</button>
+    </form>
+  </article>
+</section>
+{% endblock %}

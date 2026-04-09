@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}新建会话 | 圆桌讨论{% endblock %}
+{% block content %}
+<section class="page-head">
+  <p class="eyebrow">会话编排</p>
+  <h1>新建会话</h1>
+  <p class="lede">在启动执行前，先固化任务、角色和附件快照。</p>
+</section>
+
+<section class="hero-strip">
+  <div>
+    <strong>执行链路</strong>
+    <p>草稿 → 排队中 → 执行中 → 已完成</p>
+  </div>
+  <div>
+    <strong>已配置 Provider</strong>
+    <p>{{ providers | selectattr("configured") | list | length }} 个可用</p>
+  </div>
+</section>
+
+<form id="session-form" class="session-layout">
+  <article class="panel wide">
+    <h2>任务简报</h2>
+    <label>会话标题</label>
+    <input type="text" name="title" required>
+    <label>项目名称</label>
+    <input type="text" name="project_name" required>
+    <label>任务描述</label>
+    <textarea name="task_description" rows="7" required></textarea>
+  </article>
+
+  <article class="panel">
+    <h2>附件</h2>
+    <p>在启动会话前，先上传参考资料。</p>
+    <input type="file" id="attachment-input">
+    <button type="button" id="upload-button">上传附件</button>
+    <ul id="attachment-list" class="attachment-list"></ul>
+  </article>
+
+  <article class="panel wide">
+    <h2>角色模板</h2>
+    <div class="role-grid">
+      {% for role_id, template in role_templates.items() %}
+        <section class="role-card" data-role-id="{{ role_id }}">
+          <label class="toggle-row">
+            <span>启用 {{ template.display_name }}</span>
+            <input type="checkbox" class="role-enabled" checked>
+          </label>
+          <label>显示名称</label>
+          <input type="text" class="role-display-name" value="{{ template.display_name }}">
+          <label>职责说明</label>
+          <textarea class="role-responsibility" rows="3">{{ template.responsibility }}</textarea>
+          <label>角色指令</label>
+          <textarea class="role-instruction" rows="4">{{ template.instruction }}</textarea>
+          <label>绑定模型</label>
+          <select class="role-model">
+            {% for model_name, enabled in settings.enabled_models.items() %}
+              <option value="{{ model_name }}" {% if model_name == template.model %}selected{% endif %}>
+                {{ model_name }}{% if not enabled %}（已禁用）{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </section>
+      {% endfor %}
+    </div>
+  </article>
+
+  <article class="panel wide" id="recent">
+    <div class="panel-footer">
+      <button type="submit">创建草稿并启动</button>
+    </div>
+  </article>
+</form>
+{% endblock %}

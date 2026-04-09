@@ -5,11 +5,17 @@ RoundTable 数据结构定义
 - 轮间传递（结构化知识提取）
 - Checkpoint 恢复
 - 事件审计
+- Web 会话快照与状态持久化
 """
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
+
+
+def utc_now_iso() -> str:
+    """返回 UTC ISO 时间戳。"""
+    return datetime.now(timezone.utc).isoformat()
 
 
 class StageType(Enum):
@@ -37,6 +43,16 @@ class EventType(Enum):
     RETRY = "retry"
 
 
+class SessionStatusType(Enum):
+    """Web 会话状态枚举"""
+    DRAFT = "draft"
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    INTERRUPTED = "interrupted"
+
+
 @dataclass
 class RoundOutput:
     """
@@ -59,7 +75,7 @@ class RoundOutput:
     tokens_out: int = 0
     latency_ms: int = 0
     cost_usd: float = 0.0
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -184,7 +200,7 @@ class RoundSummary:
     action_items: List[str] = field(default_factory=list)  # 待决事项
     next_stage: str = ""  # 下一阶段
     quality_score: float = 0.0  # 质量评分 0-1
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -248,7 +264,7 @@ class DiscussionEvent:
     stage: str
     round: int = 0
     detail: Dict[str, Any] = field(default_factory=dict)
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -278,7 +294,7 @@ class Checkpoint:
     summary: Optional[Dict[str, Any]] = None
     participants_state: Dict[str, Any] = field(default_factory=dict)
     event_log: List[Dict[str, Any]] = field(default_factory=list)
-    timestamp: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = field(default_factory=utc_now_iso)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -328,7 +344,7 @@ class FinalReport:
     total_cost: float = 0.0
     total_tokens: int = 0
     quality_score: float = 0.0
-    generated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat())
+    generated_at: str = field(default_factory=utc_now_iso)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -362,6 +378,205 @@ class FinalReport:
                 md += f"- {source}\n"
 
         return md
+
+
+@dataclass
+class RoleConfig:
+    """一次会话中的角色配置快照"""
+    role_id: str
+    enabled: bool = True
+    display_name: str = ""
+    responsibility: str = ""
+    instruction: str = ""
+    model: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "role_id": self.role_id,
+            "enabled": self.enabled,
+            "display_name": self.display_name,
+            "responsibility": self.responsibility,
+            "instruction": self.instruction,
+            "model": self.model,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "RoleConfig":
+        return cls(
+            role_id=data.get("role_id", ""),
+            enabled=data.get("enabled", True),
+            display_name=data.get("display_name", ""),
+            responsibility=data.get("responsibility", ""),
+            instruction=data.get("instruction", ""),
+            model=data.get("model", ""),
+        )
+
+
+@dataclass
+class AttachmentRecord:
+    """一次会话中的附件状态"""
+    attachment_id: str
+    filename: str
+    extension: str
+    size_bytes: int
+    stored_path: str
+    classification: str = "internal"
+    injection_mode: str = "listed_only"
+    extraction_status: str = "pending"
+    extraction_error: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "attachment_id": self.attachment_id,
+            "filename": self.filename,
+            "extension": self.extension,
+            "size_bytes": self.size_bytes,
+            "stored_path": self.stored_path,
+            "classification": self.classification,
+            "injection_mode": self.injection_mode,
+            "extraction_status": self.extraction_status,
+            "extraction_error": self.extraction_error,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AttachmentRecord":
+        return cls(
+            attachment_id=data.get("attachment_id", ""),
+            filename=data.get("filename", ""),
+            extension=data.get("extension", ""),
+            size_bytes=data.get("size_bytes", 0),
+            stored_path=data.get("stored_path", ""),
+            classification=data.get("classification", "internal"),
+            injection_mode=data.get("injection_mode", "listed_only"),
+            extraction_status=data.get("extraction_status", "pending"),
+            extraction_error=data.get("extraction_error"),
+        )
+
+
+@dataclass
+class ProviderSecretState:
+    """设置页展示用 provider secret 状态"""
+    provider: str
+    configured: bool = False
+    masked_value: str = ""
+    connection_status: str = "unknown"
+    last_checked_at: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "provider": self.provider,
+            "configured": self.configured,
+            "masked_value": self.masked_value,
+            "connection_status": self.connection_status,
+            "last_checked_at": self.last_checked_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ProviderSecretState":
+        return cls(
+            provider=data.get("provider", ""),
+            configured=data.get("configured", False),
+            masked_value=data.get("masked_value", ""),
+            connection_status=data.get("connection_status", "unknown"),
+            last_checked_at=data.get("last_checked_at"),
+        )
+
+
+@dataclass
+class SessionManifest:
+    """会话启动前后的不可变输入快照"""
+    session_id: str
+    title: str
+    project_name: str
+    task_description: str
+    created_at: str = field(default_factory=utc_now_iso)
+    created_from: str = "web"
+    roles: List[RoleConfig] = field(default_factory=list)
+    attachments: List[AttachmentRecord] = field(default_factory=list)
+    model_snapshot: Dict[str, Any] = field(default_factory=dict)
+    settings_snapshot: Dict[str, Any] = field(default_factory=dict)
+    execution_snapshot: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "title": self.title,
+            "project_name": self.project_name,
+            "task_description": self.task_description,
+            "created_at": self.created_at,
+            "created_from": self.created_from,
+            "roles": [role.to_dict() for role in self.roles],
+            "attachments": [attachment.to_dict() for attachment in self.attachments],
+            "model_snapshot": self.model_snapshot,
+            "settings_snapshot": self.settings_snapshot,
+            "execution_snapshot": self.execution_snapshot,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SessionManifest":
+        return cls(
+            session_id=data.get("session_id", ""),
+            title=data.get("title", ""),
+            project_name=data.get("project_name", ""),
+            task_description=data.get("task_description", ""),
+            created_at=data.get("created_at", utc_now_iso()),
+            created_from=data.get("created_from", "web"),
+            roles=[RoleConfig.from_dict(item) for item in data.get("roles", [])],
+            attachments=[AttachmentRecord.from_dict(item) for item in data.get("attachments", [])],
+            model_snapshot=data.get("model_snapshot", {}),
+            settings_snapshot=data.get("settings_snapshot", {}),
+            execution_snapshot=data.get("execution_snapshot", {}),
+        )
+
+
+@dataclass
+class SessionStatus:
+    """会话运行态读模型"""
+    session_id: str
+    status: SessionStatusType = SessionStatusType.DRAFT
+    current_stage: Optional[str] = None
+    completed_stages: List[str] = field(default_factory=list)
+    stage_summaries: Dict[str, Any] = field(default_factory=dict)
+    error_summary: Optional[str] = None
+    next_action: Optional[str] = None
+    report_path: Optional[str] = None
+    cost_summary: Dict[str, Any] = field(default_factory=dict)
+    updated_at: str = field(default_factory=utc_now_iso)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "status": self.status.value,
+            "current_stage": self.current_stage,
+            "completed_stages": self.completed_stages,
+            "stage_summaries": self.stage_summaries,
+            "error_summary": self.error_summary,
+            "next_action": self.next_action,
+            "report_path": self.report_path,
+            "cost_summary": self.cost_summary,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SessionStatus":
+        status_value = data.get("status", SessionStatusType.DRAFT.value)
+        try:
+            status = SessionStatusType(status_value)
+        except ValueError:
+            status = SessionStatusType.DRAFT
+
+        return cls(
+            session_id=data.get("session_id", ""),
+            status=status,
+            current_stage=data.get("current_stage"),
+            completed_stages=data.get("completed_stages", []),
+            stage_summaries=data.get("stage_summaries", {}),
+            error_summary=data.get("error_summary"),
+            next_action=data.get("next_action"),
+            report_path=data.get("report_path"),
+            cost_summary=data.get("cost_summary", {}),
+            updated_at=data.get("updated_at", utc_now_iso()),
+        )
 
 
 # 便捷函数

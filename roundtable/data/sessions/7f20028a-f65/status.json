@@ -1,0 +1,48 @@
+{
+  "session_id": "7f20028a-f65",
+  "status": "completed",
+  "current_stage": null,
+  "completed_stages": [
+    "independent",
+    "blue_team",
+    "summary",
+    "report"
+  ],
+  "stage_summaries": {
+    "independent": {
+      "output_count": 2
+    },
+    "blue_team": {
+      "total_issues": 0
+    },
+    "summary": {
+      "consensus_points": [
+        "共识点 1",
+        "共识点 2"
+      ],
+      "disagreements": [
+        {
+          "topic": "分歧点 1",
+          "positions": {}
+        }
+      ]
+    },
+    "report": {
+      "report_path": "output\\RT Manual Test\\final_report.md"
+    }
+  },
+  "error_summary": null,
+  "next_action": "可查看结果",
+  "report_path": "output\\RT Manual Test\\final_report.md",
+  "cost_summary": {
+    "session_id": "7f20028a-f65",
+    "total_budget": 0.5,
+    "spent": 0.0,
+    "remaining": 0.5,
+    "usage_percent": 0.0,
+    "call_count": 4,
+    "is_exceeded": false,
+    "warning_triggered": false
+  },
+  "updated_at": "2026-04-05T23:26:54.450731+00:00"
+}

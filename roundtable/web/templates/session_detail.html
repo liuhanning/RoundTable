@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}会话详情 | 圆桌讨论{% endblock %}
+{% block content %}
+<section class="page-head">
+  <p class="eyebrow">会话详情</p>
+  <h1>{{ manifest.title }}</h1>
+  <p class="lede">{{ manifest.project_name }} · {{ status_labels.get(status.status, status.status) }}</p>
+</section>
+
+<section class="detail-grid" data-session-id="{{ manifest.session_id }}">
+  <article class="panel">
+    <h2>执行状态</h2>
+    <div id="session-status" class="status-block">
+      <strong>{{ status_labels.get(status.status, status.status) }}</strong>
+      <p>当前阶段：{{ stage_labels.get(status.current_stage, status.current_stage) if status.current_stage else "尚未开始" }}</p>
+      <p>下一步动作：{{ status.next_action or "无" }}</p>
+      {% if status.error_summary %}
+        <p class="error-copy">错误：{{ status.error_summary }}</p>
+      {% endif %}
+    </div>
+    <button type="button" id="poll-status-button">刷新状态</button>
+  </article>
+
+  <article class="panel">
+    <h2>阶段时间线</h2>
+    <ul class="timeline">
+      {% for stage in status.completed_stages %}
+        <li>{{ stage_labels.get(stage, stage) }}</li>
+      {% endfor %}
+      {% if status.current_stage %}
+        <li class="current">{{ stage_labels.get(status.current_stage, status.current_stage) }}</li>
+      {% endif %}
+    </ul>
+  </article>
+
+  <article class="panel wide">
+    <h2>配置快照</h2>
+    <pre>{{ manifest_pretty }}</pre>
+  </article>
+
+  <article class="panel wide">
+    <h2>报告内容</h2>
+    {% if report_markdown %}
+      <pre class="report-markdown">{{ report_markdown }}</pre>
+    {% else %}
+      <p>报告尚未生成。</p>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}
